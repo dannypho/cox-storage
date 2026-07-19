@@ -1,4 +1,4 @@
-package com.example;
+package com.coxstorage;
 
 import com.google.inject.Provides;
 import javax.inject.Inject;
@@ -14,40 +14,37 @@ import net.runelite.client.plugins.PluginDescriptor;
 
 @Slf4j
 @PluginDescriptor(
-	name = "Example"
+	name = "CoX Storage"
 )
-public class ExamplePlugin extends Plugin
+public class CoxStoragePlugin extends Plugin
 {
 	@Inject
 	private Client client;
 
 	@Inject
-	private ExampleConfig config;
+	private CoxStorageConfig config;
 
 	@Override
 	protected void startUp() throws Exception
 	{
-		log.debug("Example started!");
+		log.debug("CoX Storage started!");
 	}
 
 	@Override
 	protected void shutDown() throws Exception
 	{
-		log.debug("Example stopped!");
+		log.debug("CoX Storage stopped!");
 	}
 
 	@Subscribe
 	public void onGameStateChanged(GameStateChanged gameStateChanged)
 	{
-		if (gameStateChanged.getGameState() == GameState.LOGGED_IN)
-		{
-			client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "Example says " + config.greeting(), null);
-		}
+		// Nothing for now
 	}
 
 	@Provides
-	ExampleConfig provideConfig(ConfigManager configManager)
+	CoxStorageConfig provideConfig(ConfigManager configManager)
 	{
-		return configManager.getConfig(ExampleConfig.class);
+		return configManager.getConfig(CoxStorageConfig.class);
 	}
 }
