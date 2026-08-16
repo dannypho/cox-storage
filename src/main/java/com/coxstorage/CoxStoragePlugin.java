@@ -12,6 +12,7 @@ import javax.inject.Inject;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.util.ImageUtil;
+import net.runelite.client.game.ItemManager;
 
 import javax.inject.Inject;
 
@@ -21,6 +22,9 @@ import javax.inject.Inject;
 )
 public class CoxStoragePlugin extends Plugin
 {
+	@Inject
+	private ItemManager itemManager;
+
 	@Inject
 	private CoxStorageConfig config;
 
@@ -34,7 +38,7 @@ public class CoxStoragePlugin extends Plugin
 	@Override
 	protected void startUp()
 	{
-		panel = new CoxStoragePanel();
+		panel = new CoxStoragePanel(itemManager);
 
 		navigationButton = NavigationButton.builder()
 				.tooltip("CoX Storage")
@@ -57,26 +61,14 @@ public class CoxStoragePlugin extends Plugin
 	@Subscribe
 	public void onItemContainerChanged(ItemContainerChanged event)
 	{
-		if (event.getContainerId() != 583 && event.getContainerId() != 33350)
+		if (event.getContainerId() != 583)
 		{
 			return;
 		}
 
-		log.info("Container ID: {}", event.getContainerId());
-
-		Item[] items = event.getItemContainer().getItems();
-
-		for (int slot = 0; slot < items.length; slot++)
-		{
-			Item item = items[slot];
-
-			log.info(
-					"Slot: {}, Item ID: {}, Quantity: {}",
-					slot,
-					item.getId(),
-					item.getQuantity()
-			);
-		}
+		panel.updatePrivateStorage(
+				event.getItemContainer().getItems()
+		);
 	}
 
 	@Provides
