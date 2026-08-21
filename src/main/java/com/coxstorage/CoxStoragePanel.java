@@ -69,9 +69,13 @@ public class CoxStoragePanel extends PluginPanel
             {
                 Item item = items[i];
 
-                itemManager
-                        .getImage(item.getId(), item.getQuantity(), true)
-                        .addTo(slot);
+                int quantity = item.getQuantity();
+
+                itemManager.getImage(
+                        item.getId(),
+                        quantity > 1 ? quantity : 1,
+                        quantity > 1
+                ).addTo(slot);
             }
             else
             {
