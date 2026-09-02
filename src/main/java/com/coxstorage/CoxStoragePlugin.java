@@ -167,7 +167,7 @@ public class CoxStoragePlugin extends Plugin
 		{
 			return;
 		}
-
+		int initialIndex = dragged.getIndex();
 		int currentIndex;
 
 		if (draggedOn != null)
@@ -182,8 +182,7 @@ public class CoxStoragePlugin extends Plugin
 		if (currentIndex != lastDraggedOnIndex)
 		{
 			lastDraggedOnIndex = currentIndex;
-
-			log.info("dragged onto index={}", currentIndex);
+			log.info("initial index: {} dragged onto index={}", initialIndex, currentIndex);
 		}
 	}
 
