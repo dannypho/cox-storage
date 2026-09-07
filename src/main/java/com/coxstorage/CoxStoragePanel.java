@@ -47,7 +47,7 @@ public class CoxStoragePanel extends PluginPanel
         {
             JLabel slot = privateSlots[i];
 
-            if (i < items.length && items[i].getId() != -1)
+            if (i < items.length && items[i] != null && items[i].getId() != -1)
             {
                 Item item = items[i];
                 int quantity = item.getQuantity();

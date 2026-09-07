@@ -53,7 +53,9 @@ public class CoxStoragePlugin extends Plugin
 	private Map<Integer, Integer> previousInventory = new HashMap<>();
 	private String lastInput = "";
 	private int lastDraggedOnIndex = -1;
+	private boolean storageInitialized = false;
 
+	private final Item[] simulatedStorage = new Item[120];
 	private Map<Integer, Integer> getItemCounts(Item[] items)
 	{
 		Map<Integer, Integer> counts = new HashMap<>();
@@ -149,11 +151,25 @@ public class CoxStoragePlugin extends Plugin
 			return;
 		}
 
-		if (event.getContainerId() == 583)
+		if (event.getContainerId() == 583 && !storageInitialized)
 		{
-			panel.updatePrivateStorage(
-					event.getItemContainer().getItems()
-			);
+			Item[] items = event.getItemContainer().getItems();
+
+			for (int i = 0; i < simulatedStorage.length; i++)
+			{
+				if (i < items.length)
+				{
+					simulatedStorage[i] = items[i];
+				}
+				else
+				{
+					simulatedStorage[i] = null;
+				}
+			}
+
+			storageInitialized = true;
+
+			panel.updatePrivateStorage(simulatedStorage);
 		}
 	}
 
