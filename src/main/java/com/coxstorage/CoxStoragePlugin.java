@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Item;
 import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.events.MenuOptionClicked;
+import net.runelite.api.gameval.InterfaceID;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
@@ -15,12 +16,8 @@ import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.util.ImageUtil;
 import net.runelite.client.game.ItemManager;
 import net.runelite.api.Client;
-import net.runelite.api.ItemContainer;
-import net.runelite.api.events.WidgetClosed;
 import net.runelite.api.events.WidgetDrag;
-import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.widgets.Widget;
-import net.runelite.api.events.ClientTick;
 import net.runelite.api.events.VarClientStrChanged;
 import net.runelite.api.gameval.VarClientID;
 import java.util.HashMap;
@@ -34,7 +31,6 @@ import java.util.Objects;
 )
 public class CoxStoragePlugin extends Plugin
 {
-	private boolean wasDragging = false;
 
 	@Inject
 	private ItemManager itemManager;
@@ -75,6 +71,16 @@ public class CoxStoragePlugin extends Plugin
 		}
 
 		return counts;
+	}
+
+	private void swapStorageItems(int fromIndex, int toIndex)
+	{
+		Item temp = simulatedStorage[fromIndex];
+
+		simulatedStorage[fromIndex] = simulatedStorage[toIndex];
+		simulatedStorage[toIndex] = temp;
+
+		panel.updatePrivateStorage(simulatedStorage);
 	}
 
 	@Subscribe
@@ -176,30 +182,32 @@ public class CoxStoragePlugin extends Plugin
 	@Subscribe
 	public void onWidgetDrag(WidgetDrag event)
 	{
-		Widget dragged = client.getDraggedWidget();
-		Widget draggedOn = client.getDraggedOnWidget();
+		if (client.getMouseCurrentButton() != 0)
+		{
+			return; // wait until release
+		}
 
-		if (dragged == null)
+		Widget source = client.getDraggedWidget();
+		Widget destination = client.getDraggedOnWidget();
+
+		if (source == null || destination == null
+				|| source.getId() != InterfaceID.RaidsStoragePrivate.ITEMS
+				|| destination.getId() != InterfaceID.RaidsStoragePrivate.ITEMS)
 		{
 			return;
 		}
-		int initialIndex = dragged.getIndex();
-		int currentIndex;
 
-		if (draggedOn != null)
+		int sourceSlot = source.getIndex();
+		int destinationSlot = destination.getIndex();
+
+		log.info("source index: {} destination index: {}", sourceSlot, destinationSlot);
+
+		if (sourceSlot != destinationSlot)
 		{
-			currentIndex = draggedOn.getIndex();
-		}
-		else
-		{
-			currentIndex = dragged.getIndex();
+			swapStorageItems(sourceSlot, destinationSlot);
 		}
 
-		if (currentIndex != lastDraggedOnIndex)
-		{
-			lastDraggedOnIndex = currentIndex;
-			log.info("initial index: {} dragged onto index={}", initialIndex, currentIndex);
-		}
+		// Indices are 0–27
 	}
 
 	@Subscribe
