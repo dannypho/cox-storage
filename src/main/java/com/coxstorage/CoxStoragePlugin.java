@@ -22,6 +22,8 @@ import net.runelite.api.events.VarClientStrChanged;
 import net.runelite.api.gameval.VarClientID;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.ArrayDeque;
+import java.util.Queue;
 
 import java.util.Objects;
 
@@ -29,8 +31,23 @@ import java.util.Objects;
 @PluginDescriptor(
 		name = "CoX Storage"
 )
+
+
+
 public class CoxStoragePlugin extends Plugin
 {
+
+	private static class PendingStore
+	{
+		private final int itemId;
+		private final int inventorySlot;
+
+		private PendingStore(int itemId, int inventorySlot)
+		{
+			this.itemId = itemId;
+			this.inventorySlot = inventorySlot;
+		}
+	}
 
 	@Inject
 	private ItemManager itemManager;
@@ -48,10 +65,10 @@ public class CoxStoragePlugin extends Plugin
 	private NavigationButton navigationButton;
 	private Map<Integer, Integer> previousInventory = new HashMap<>();
 	private String lastInput = "";
-	private int lastDraggedOnIndex = -1;
 	private boolean storageInitialized = false;
-
+	private final Queue<PendingStore> pendingStores = new ArrayDeque<>();
 	private final Item[] simulatedStorage = new Item[120];
+
 	private Map<Integer, Integer> getItemCounts(Item[] items)
 	{
 		Map<Integer, Integer> counts = new HashMap<>();
@@ -124,7 +141,7 @@ public class CoxStoragePlugin extends Plugin
 	@Override
 	protected void shutDown()
 	{
-		log.debug("CoX Storage stopped!");
+		clientToolbar.removeNavigation(navigationButton);
 	}
 
 	@Subscribe
@@ -137,12 +154,14 @@ public class CoxStoragePlugin extends Plugin
 			Map<Integer, Integer> currentInventory =
 					getItemCounts(event.getItemContainer().getItems());
 
-			for (Integer itemId : currentInventory.keySet())
+			Map<Integer, Integer> confirmedStores = new HashMap<>();
+
+			for (Integer itemId : previousInventory.keySet())
 			{
 				int oldQuantity = previousInventory.getOrDefault(itemId, 0);
-				int newQuantity = currentInventory.get(itemId);
+				int newQuantity = currentInventory.getOrDefault(itemId, 0);
 
-				if (oldQuantity != newQuantity)
+				if (newQuantity < oldQuantity)
 				{
 					log.info(
 							"Inventory item {} changed: {} -> {}",
@@ -150,8 +169,59 @@ public class CoxStoragePlugin extends Plugin
 							oldQuantity,
 							newQuantity
 					);
+
+					confirmedStores.put(
+							itemId,
+							oldQuantity - newQuantity
+					);
 				}
 			}
+
+			Queue<PendingStore> remainingStores = new ArrayDeque<>();
+
+			while (!pendingStores.isEmpty())
+			{
+				PendingStore pendingStore = pendingStores.poll();
+
+				int itemId = pendingStore.itemId;
+
+				int confirmedAmount =
+						confirmedStores.getOrDefault(itemId, 0);
+
+				if (confirmedAmount > 0)
+				{
+					log.info(
+							"Confirmed store: itemId={}, inventorySlot={}",
+							pendingStore.itemId,
+							pendingStore.inventorySlot
+					);
+
+					confirmedStores.put(
+							itemId,
+							confirmedAmount - 1
+					);
+
+					boolean stackable =
+							itemManager.getItemComposition(itemId).isStackable();
+
+					if (!stackable)
+					{
+						pendingStores.removeIf(store ->
+								store.itemId == itemId &&
+										store.inventorySlot == pendingStore.inventorySlot
+						);
+					}
+				}
+				else
+				{
+					remainingStores.offer(pendingStore);
+				}
+			}
+
+			pendingStores.addAll(remainingStores);
+
+			pendingStores.addAll(remainingStores);
+			log.info("Pending stores after update: {}", pendingStores);
 
 			previousInventory = currentInventory;
 			return;
@@ -234,6 +304,18 @@ public class CoxStoragePlugin extends Plugin
 					event.getParam1()
 			);
         }
+
+		if (event.getMenuOption().equals("Store"))
+		{
+			pendingStores.offer(
+					new PendingStore(
+							event.getItemId(),
+							event.getParam0()
+					)
+			);
+
+			log.info("Queued store: itemId={}", event.getItemId());
+		}
     }
 
 	@Provides
