@@ -69,6 +69,36 @@ public class CoxStoragePlugin extends Plugin
 	private final Queue<PendingStore> pendingStores = new ArrayDeque<>();
 	private final Item[] simulatedStorage = new Item[120];
 
+	private int findFirstEmptyStorageSlot()
+	{
+		for (int i = 0; i < simulatedStorage.length; i++)
+		{
+			Item item = simulatedStorage[i];
+
+			if (item == null || item.getId() == -1)
+			{
+				return i;
+			}
+		}
+
+		return -1;
+	}
+
+	private int findStorageItemSlot(int itemId)
+	{
+		for (int i = 0; i < simulatedStorage.length; i++)
+		{
+			Item item = simulatedStorage[i];
+
+			if (item != null && item.getId() == itemId)
+			{
+				return i;
+			}
+		}
+
+		return -1;
+	}
+
 	private Map<Integer, Integer> getItemCounts(Item[] items)
 	{
 		Map<Integer, Integer> counts = new HashMap<>();
@@ -206,11 +236,44 @@ public class CoxStoragePlugin extends Plugin
 
 					if (!stackable)
 					{
+						int emptySlot = findFirstEmptyStorageSlot();
+
+						if (emptySlot != -1)
+						{
+							simulatedStorage[emptySlot] = new Item(itemId, 1);
+							panel.updatePrivateStorage(simulatedStorage);
+						}
+
 						pendingStores.removeIf(store ->
 								store.itemId == itemId &&
 										store.inventorySlot == pendingStore.inventorySlot
 						);
 					}
+
+					else
+					{
+						int existingSlot = findStorageItemSlot(itemId);
+
+						if (existingSlot != -1)
+						{
+							Item existingItem = simulatedStorage[existingSlot];
+
+							simulatedStorage[existingSlot] =
+									new Item(itemId, existingItem.getQuantity() + 1);
+						}
+						else
+						{
+							int emptySlot = findFirstEmptyStorageSlot();
+
+							if (emptySlot != -1)
+							{
+								simulatedStorage[emptySlot] = new Item(itemId, 1);
+							}
+						}
+
+						panel.updatePrivateStorage(simulatedStorage);
+					}
+
 				}
 				else
 				{
@@ -218,7 +281,6 @@ public class CoxStoragePlugin extends Plugin
 				}
 			}
 
-			pendingStores.addAll(remainingStores);
 
 			pendingStores.addAll(remainingStores);
 			log.info("Pending stores after update: {}", pendingStores);
