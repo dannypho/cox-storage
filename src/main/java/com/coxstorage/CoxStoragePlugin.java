@@ -49,6 +49,18 @@ public class CoxStoragePlugin extends Plugin
 		}
 	}
 
+	private static class PendingWithdraw
+	{
+		private final int itemId;
+		private final int storageSlot;
+
+		private PendingWithdraw(int itemId, int storageSlot)
+		{
+			this.itemId = itemId;
+			this.storageSlot = storageSlot;
+		}
+	}
+
 	@Inject
 	private ItemManager itemManager;
 
@@ -67,6 +79,7 @@ public class CoxStoragePlugin extends Plugin
 	private String lastInput = "";
 	private boolean storageInitialized = false;
 	private final Queue<PendingStore> pendingStores = new ArrayDeque<>();
+	private final Queue<PendingWithdraw> pendingWithdraws = new ArrayDeque<>();
 	private final Item[] simulatedStorage = new Item[120];
 
 	private int findFirstEmptyStorageSlot()
@@ -185,6 +198,7 @@ public class CoxStoragePlugin extends Plugin
 					getItemCounts(event.getItemContainer().getItems());
 
 			Map<Integer, Integer> confirmedStores = new HashMap<>();
+			Map<Integer, Integer> confirmedWithdraws = new HashMap<>();
 
 			for (Integer itemId : previousInventory.keySet())
 			{
@@ -207,7 +221,29 @@ public class CoxStoragePlugin extends Plugin
 				}
 			}
 
+			for (Integer itemId : currentInventory.keySet())
+			{
+				int oldQuantity = previousInventory.getOrDefault(itemId, 0);
+				int newQuantity = currentInventory.getOrDefault(itemId, 0);
+
+				if (newQuantity > oldQuantity)
+				{
+					log.info(
+							"Confirmed inventory increase: itemId={}, {} -> {}",
+							itemId,
+							oldQuantity,
+							newQuantity
+					);
+
+					confirmedWithdraws.put(
+							itemId,
+							newQuantity - oldQuantity
+					);
+				}
+			}
+
 			Queue<PendingStore> remainingStores = new ArrayDeque<>();
+			Queue<PendingWithdraw> remainingWithdraws = new ArrayDeque<>();
 
 			while (!pendingStores.isEmpty())
 			{
@@ -281,9 +317,76 @@ public class CoxStoragePlugin extends Plugin
 				}
 			}
 
+			while (!pendingWithdraws.isEmpty())
+			{
+				PendingWithdraw pendingWithdraw = pendingWithdraws.poll();
+
+				int itemId = pendingWithdraw.itemId;
+
+				int confirmedAmount =
+						confirmedWithdraws.getOrDefault(itemId, 0);
+
+				if (confirmedAmount > 0)
+				{
+					log.info(
+							"Confirmed withdraw: itemId={}, storageSlot={}",
+							pendingWithdraw.itemId,
+							pendingWithdraw.storageSlot
+					);
+
+					confirmedWithdraws.put(
+							itemId,
+							confirmedAmount - 1
+					);
+
+					boolean stackable =
+							itemManager.getItemComposition(itemId).isStackable();
+
+					int storageSlot = pendingWithdraw.storageSlot;
+					Item storedItem = simulatedStorage[storageSlot];
+
+					if (!stackable)
+					{
+						simulatedStorage[storageSlot] = null;
+
+						pendingWithdraws.removeIf(withdraw ->
+								withdraw.itemId == itemId &&
+										withdraw.storageSlot == storageSlot
+						);
+					}
+					else if (storedItem != null && storedItem.getId() == itemId)
+					{
+						int newQuantity = storedItem.getQuantity() - 1;
+
+						if (newQuantity > 0)
+						{
+							simulatedStorage[storageSlot] =
+									new Item(itemId, newQuantity);
+						}
+						else
+						{
+							simulatedStorage[storageSlot] = null;
+
+							pendingWithdraws.removeIf(withdraw ->
+									withdraw.itemId == itemId &&
+											withdraw.storageSlot == storageSlot
+							);
+						}
+					}
+
+					panel.updatePrivateStorage(simulatedStorage);
+				}
+				else
+				{
+					remainingWithdraws.offer(pendingWithdraw);
+				}
+			}
+
 
 			pendingStores.addAll(remainingStores);
+			pendingWithdraws.addAll(remainingWithdraws);
 			log.info("Pending stores after update: {}", pendingStores);
+			log.info("Pending withdraws after update: {}", pendingWithdraws);
 
 			previousInventory = currentInventory;
 			return;
@@ -377,6 +480,18 @@ public class CoxStoragePlugin extends Plugin
 			);
 
 			log.info("Queued store: itemId={}", event.getItemId());
+		}
+
+		if (event.getMenuOption().equals("Withdraw"))
+		{
+			pendingWithdraws.offer(
+					new PendingWithdraw(
+							event.getItemId(),
+							event.getParam0()
+					)
+			);
+
+			log.info("Queued withdraw: itemId={}", event.getItemId());
 		}
     }
 
