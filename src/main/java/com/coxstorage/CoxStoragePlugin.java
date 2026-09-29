@@ -24,7 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.ArrayDeque;
 import java.util.Queue;
-
+import net.runelite.api.events.WidgetClosed;
 import java.util.Objects;
 
 @Slf4j
@@ -81,6 +81,30 @@ public class CoxStoragePlugin extends Plugin
 	private final Queue<PendingStore> pendingStores = new ArrayDeque<>();
 	private final Queue<PendingWithdraw> pendingWithdraws = new ArrayDeque<>();
 	private final Item[] simulatedStorage = new Item[120];
+
+	private void compactStorage()
+	{
+		int writeIndex = 0;
+
+		for (int readIndex = 0; readIndex < simulatedStorage.length; readIndex++)
+		{
+			Item item = simulatedStorage[readIndex];
+
+			if (item != null && item.getId() != -1)
+			{
+				simulatedStorage[writeIndex] = item;
+
+				if (writeIndex != readIndex)
+				{
+					simulatedStorage[readIndex] = null;
+				}
+
+				writeIndex++;
+			}
+		}
+
+		panel.updatePrivateStorage(simulatedStorage);
+	}
 
 	private int findFirstEmptyStorageSlot()
 	{
@@ -179,6 +203,15 @@ public class CoxStoragePlugin extends Plugin
 				.build();
 
 		clientToolbar.addNavigation(navigationButton);
+	}
+
+	@Subscribe
+	public void onWidgetClosed(WidgetClosed event)
+	{
+		if (event.getGroupId() == InterfaceID.RAIDS_STORAGE_PRIVATE)
+		{
+			compactStorage();
+		}
 	}
 
 	@Override
